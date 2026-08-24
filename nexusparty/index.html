@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NexusParty — free multi-provider voice party</title>
+<meta name="description" content="NexusParty: a group voice-chat party app that costs $0 and re-routes itself across free providers when anything fails.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="logo">🔗 Nexus<span class="accent">Party</span></div>
+  <p class="tagline">The group voice party that costs <b>$0</b> — one room, many free providers, automatic re-routing.</p>
+  <div class="pills">
+    <span class="pill" id="pill-engine">engine: —</span>
+    <span class="pill ok" id="pill-net">net: checking…</span>
+    <span class="pill" id="pill-room">room: —</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ══════════════ LOBBY ══════════════ -->
+<section class="card" id="lobby">
+  <h2>🚪 Lobby <small>pick an identity and jump in — no signup, ever</small></h2>
+  <div class="lobby-inner">
+    <div class="avatars" id="avatar-row"></div>
+    <input id="inp-name" placeholder="display name" maxlength="18" spellcheck="false" autocomplete="off">
+    <input id="inp-room" placeholder="room name (share it with friends!)" maxlength="24" spellcheck="false" autocomplete="off">
+    <div class="join-row">
+      <button class="btn primary big" id="btn-join">🎤 Join the party</button>
+      <button class="btn big ghost" id="btn-settings">⚙️ providers</button>
+    </div>
+    <p class="hint" id="lobby-hint">The supervisor picks the best free provider automatically and switches mid-call if one fails.</p>
+  </div>
+</section>
+
+<!-- ══════════════ ROOM ══════════════ -->
+<section class="card" id="room" hidden>
+  <div class="room-head">
+    <span class="room-title">📻 <b id="room-name"></b></span>
+    <select id="engine-picker" title="switch media provider"></select>
+    <span class="pill ok" id="conn-state">connecting…</span>
+    <button class="btn ghost" id="btn-share">🔗 copy invite</button>
+  </div>
+
+  <!-- embedded engines (Jitsi / Daily) render here -->
+  <div id="embed-mount" hidden></div>
+
+  <!-- native engines (mesh) use our own UI -->
+  <div id="native-ui">
+    <div class="seats" id="seats"></div>
+    <div class="controls">
+      <button class="btn big" id="btn-mute">🎙️ mute</button>
+      <button class="btn" id="btn-hand">✋ raise hand</button>
+      <button class="btn" id="btn-music">🎵 BGM: off</button>
+      <span class="spacer"></span>
+      <button class="btn gift" data-gift="🎉">🎉</button>
+      <button class="btn gift" data-gift="💎">💎</button>
+      <button class="btn gift" data-gift="🚀">🚀</button>
+      <button class="btn gift" data-gift="🧡">🧡</button>
+      <span class="spacer"></span>
+      <button class="btn danger" id="btn-leave">🚪 leave</button>
+    </div>
+    <div class="chat-wrap">
+      <div class="chat" id="chat"></div>
+      <form id="chat-form"><input id="chat-inp" placeholder="say something…" maxlength="200" autocomplete="off"><button class="btn primary">send</button></form>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ CONTROL DECK (supervisor) ══════════════ -->
+<section class="card" id="deck">
+  <div class="deck-head">
+    <h2>🧠 Provider Deck <small>the multi-provider supervisor — live, not a mockup</small></h2>
+    <button class="btn ghost" id="btn-deck-toggle">hide</button>
+  </div>
+  <div id="deck-body">
+    <div class="deck-grid">
+      <div>
+        <h3>Engine ladder</h3>
+        <table class="engines" id="engine-table">
+          <thead><tr><th>engine</th><th>tier</th><th>seats</th><th>usage</th><th>status</th><th>score</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="deck-actions">
+          <button class="btn ghost" id="btn-kill-current">⚡ kill current engine (force migration)</button>
+          <button class="btn ok" id="btn-restore">💚 revive all</button>
+          <button class="btn ghost" id="btn-reprobe">↻ re-probe</button>
+        </div>
+        <div class="log-wrap">
+          <h3>Event log</h3>
+          <div class="log" id="event-log"></div>
+        </div>
+      </div>
+      <div>
+        <h3>Live infrastructure probes</h3>
+        <div class="probe-grid" id="probe-grid"></div>
+        <p class="hint">STUN/TURN rows are genuine ICE gathering tests (<code>srflx</code>/<code>relay</code> candidates). Reachability rows are opaque network-path checks.</p>
+        <div class="log-wrap">
+          <h3>How the fallback works</h3>
+          <ol class="howto">
+            <li><b>Discover</b> — joining a room tries engines in ranked order until it finds the one where the room lives (each provider is its own namespace — no central registry needed).</li>
+            <li><b>Stay free</b> — ≤ 8 seats defaults to P2P mesh (serverless, unmetered). Bigger rooms need an SFU: Jitsi public, your Daily free room, or your self-hosted Jitsi.</li>
+            <li><b>Self-heal</b> — an engine failure opens its circuit breaker, the room re-routes to the next free provider, and you reconnect automatically.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════════ SETTINGS ══════════════ -->
+<div class="modal-veil" id="settings-veil" hidden>
+  <div class="modal">
+    <h3>⚙️ Extra free providers</h3>
+    <p class="hint">The three zero-config engines always work. Add these optional ones — every one of them has a free tier.</p>
+    <label>Daily.co room URL <small>(free 10k min/mo — e.g. <code>https://yourteam.daily.co</code>)</small>
+      <input id="set-daily" placeholder="https://yourteam.daily.co" spellcheck="false">
+    </label>
+    <label>Self-hosted Jitsi domain <small>(e.g. <code>jitsi.example.com</code>)</small>
+      <input id="set-jitsi" placeholder="jitsi.example.com" spellcheck="false">
+    </label>
+    <div class="modal-actions">
+      <button class="btn ghost" id="set-cancel">cancel</button>
+      <button class="btn primary" id="set-save">save</button>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p><b>NexusParty</b> — multi-provider, zero-cost group voice. Mesh stays alive even if every server dies: media is browser ↔ browser.</p>
+</footer>
+
+<div id="toasts"></div>
+<div id="gift-layer"></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
