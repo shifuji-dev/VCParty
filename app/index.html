@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VCParty — Hydra · free multi-provider voice party</title>
+<meta name="description" content="Zero-cost group voice party with a self-switching multi-provider fallback architecture.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎧</text></svg>">
+<link rel="stylesheet" href="css/style.css">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+
+<header class="hero">
+  <div class="logo">🎧 VCParty<span class="accent">·Hydra</span></div>
+  <p class="tagline">A group voice party app that runs on <b>$0</b> — and re-routes itself across free providers when anything fails.</p>
+  <div class="pills">
+    <span class="pill" id="pill-engine">engine: —</span>
+    <span class="pill ok" id="pill-net">net: checking…</span>
+    <span class="pill" id="pill-room">room: —</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ══════════════ SECTION A · SUPERVISOR ══════════════ -->
+<section class="card" id="supervisor">
+  <h2>🧠 Fallback Supervisor <small>scorer · quota ledger · circuit breaker · deterministic room selection</small></h2>
+
+  <div class="sup-controls">
+    <label>Room <input id="sel-room" value="party-time" spellcheck="false"></label>
+    <label>Seats
+      <input id="sel-seats" type="range" min="2" max="50" value="5" oninput="document.getElementById('sel-seats-v').textContent=this.value">
+      <b id="sel-seats-v">5</b>
+    </label>
+    <button class="btn ghost" id="btn-reselect">↻ recompute (simulate epoch tick)</button>
+    <button class="btn danger" id="btn-kill-random">⚡ simulate random provider outage</button>
+    <button class="btn ok" id="btn-restore">restore all providers</button>
+  </div>
+
+  <div class="selection-banner" id="selection-banner">—</div>
+
+  <table class="engines" id="engine-table">
+    <thead><tr>
+      <th>Media engine</th><th>Tier</th><th>Max seats</th><th>Monthly quota used</th>
+      <th>Health</th><th>Breaker</th><th>Score</th><th></th>
+    </tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="hint">Kill a provider or drag a quota slider past <b>85%</b> (proactive rotation) / <b>98%</b> (hard stop) and watch the room re-route automatically. With ≤ 8 seats the P2P mesh usually wins — it costs nothing and needs no server.</p>
+
+  <div class="log-wrap">
+    <h3>📡 Event log</h3>
+    <div class="log" id="event-log"></div>
+  </div>
+</section>
+
+<!-- ══════════════ SECTION B · REAL PROBES ══════════════ -->
+<section class="card" id="probes">
+  <h2>🩺 Real Infrastructure Probes <small>these run live from your browser</small></h2>
+  <div class="probe-grid" id="probe-grid"></div>
+  <p class="hint">STUN probes perform a genuine ICE gathering test (<code>RTCPeerConnection</code>) and look for <code>srflx</code> candidates; the TURN probe looks for <code>relay</code> candidates via the free Open Relay Project. Reachability probes use opaque <code>no-cors</code> fetches — they verify the network path, not HTTP status.</p>
+  <button class="btn ghost" id="btn-reprobe">↻ re-probe everything</button>
+</section>
+
+<!-- ══════════════ SECTION C · THE PARTY ══════════════ -->
+<section class="card" id="party">
+  <h2>🎉 Live Voice Party <small>real P2P mesh · works even if every server dies</small></h2>
+
+  <div id="lobby">
+    <div class="lobby-inner">
+      <h3>Join a room</h3>
+      <div class="avatars" id="avatar-row"></div>
+      <input id="inp-name" placeholder="display name" maxlength="18" spellcheck="false">
+      <input id="inp-room" placeholder="room name (share it!)" maxlength="24" spellcheck="false">
+      <button class="btn primary big" id="btn-join">🎤 Enter the party</button>
+      <p class="hint">Open this page in another tab / phone / friend's browser with the same room name to talk for free. Media flows browser→browser; servers are only used to introduce you.</p>
+    </div>
+  </div>
+
+  <div id="room" hidden>
+    <div class="room-head">
+      <span class="room-title">📻 <b id="room-name"></b></span>
+      <span class="pill ok" id="engine-chip">mesh-peerjs</span>
+      <span class="pill" id="conn-state">connecting…</span>
+    </div>
+
+    <div class="seats" id="seats"></div>
+
+    <div class="controls">
+      <button class="btn big" id="btn-mute">🎙️ mute</button>
+      <button class="btn" id="btn-hand">✋ raise hand</button>
+      <button class="btn" id="btn-music">🎵 BGM: off</button>
+      <span class="spacer"></span>
+      <button class="btn gift" data-gift="🎉">🎉</button>
+      <button class="btn gift" data-gift="💎">💎</button>
+      <button class="btn gift" data-gift="🚀">🚀</button>
+      <button class="btn gift" data-gift="🧡">🧡</button>
+      <span class="spacer"></span>
+      <button class="btn danger" id="btn-leave">🚪 leave</button>
+    </div>
+
+    <div class="chat-wrap">
+      <div class="chat" id="chat"></div>
+      <form id="chat-form"><input id="chat-inp" placeholder="say something…" maxlength="200" autocomplete="off"><button class="btn primary">send</button></form>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p><b>VCParty·Hydra</b> — companion PoC for <i>docs/03-fallback-architecture.md</i>. Total infrastructure cost: <b>$0 / month</b>.</p>
+</footer>
+
+<div id="toasts"></div>
+<div id="gift-layer"></div>
+
+<script src="js/supervisor.js"></script>
+<script src="js/party.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
